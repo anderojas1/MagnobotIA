@@ -13,8 +13,13 @@ TEMPLATE = app
 
 
 SOURCES += main.cpp\
-        tablero.cpp
+        tablero.cpp \
+    agente.cpp \
+    nodo.cpp
 
-HEADERS  += tablero.hpp
+HEADERS  += tablero.hpp \
+    agente.hpp \
+    nodo.hpp \
+    ui_tablero.h
 
 FORMS    += tablero.ui
