@@ -24,6 +24,8 @@ Tablero::Tablero(QWidget *parent) :
     ui->lb_univalleLogo->setPixmap(pix);
     robot = new Agente();
     arbol = new QVector<Nodo*>();
+    camino = new QVector<Nodo*>();
+
 }
 
 Tablero::~Tablero()
@@ -191,61 +193,110 @@ void Tablero::on_buttonCargarArchivo_clicked()
 
 void Tablero::busquedaAmplitud() {
 
+    // Posición inicial es la posición del robot
     int posIRobot = robot->getPosI();
     int posJRobot = robot->getPosJ();
 
+    // Se crea el nodo raíz con la posición del robot
     Nodo *raiz = new Nodo(posIRobot, posJRobot, NULL, 0);
+    // Se concatena al vector de búsqueda por amplitud
     arbol->append(raiz);
+    // El nodo meta es cuando encuentra el último objetivo
     Nodo *meta = NULL;
-    int con = 0;
+    bool devolver = false;
 
-    while (!robot->objetivosCompletos()) {
-        if (con % 100000 == 0)
-            cout << "iteración " << con << endl;
-        con++;
+    while (!robot->objetivosCompletos()) {  // Mientras le falte uno o más objetivos...
+
+        // Toma el nodo que se encuentre de primero en el vector y toma la posición. Representa un cuadro en particular
         Nodo *nodo = arbol->first();
         int i = nodo->getPosI();
         int j = nodo->getPosJ();
 
-        if (i == 9 && j == 8) {
-
-            cout << "buscando en: (" << i << "," << j << ")\n";
-            cout << "valor encontrado: " << matrizValores[i][j] << endl;
-
-        }
-
+        // Busca el código en la matriz asociada
         int codigo = matrizValores[i][j];
 
+        // Si es un objetivo...
         if (codigo == 6) {
+
+            /* Elimina un objetivo del vector de objetivos del robot
+             * Pone a 0 la posición en la matriz de valores asociada (elimina el objetivo de la matriz)
+             * Reinicia el algoritmo de búsqueda
+             * El nodo es ahora la nueva posición inicial
+             * Se permite devolver al robot
+             * */
 
             robot->eliminarObjetivo();
             matrizValores[i][j] = 0;
             arbol->clear();
             arbol->append(nodo);
             cout << "objetivo encontrado en (" << i << "," << j << ")" << endl;
+            devolver = true;
 
         }
 
+        /*// Si el código es un traje...
+        else if (codigo == 3) {
+
+            robot->setTraje(true);
+
+        }*/
+
+        // Si ha encontrado todos los objetivos
         if (robot->objetivosCompletos()) {
 
+            // ¡Tenemos la meta! ¡Eureka!
             meta = nodo;
-            cout << "SIII" << endl;
 
         }
 
+        // Si faltan objetivos
         else {
-            cout << "buscando en: (" << i << "," << j << ")\n";
 
-            //cout << "valor encontrado: " << codigo << endl;
+            /* Los if a continuación son usados para evaluar si se puede mover a izquierda, derecha
+             * arriba o a abajo, para evitar desbordamientos
+             * */
 
             if (i > 0) {
 
                 int posI = i-1;
-                int costoAcumulado = explorar(posI, j);
-                cout << "costo explorado en (" << posI << "," << j << ") es: " << costoAcumulado << endl;
+                int costoAcumulado = explorar(posI, j); // Explora la posición
+
+                // Si no es un muro
                 if (costoAcumulado != -1) {
-                    Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado);
-                    arbol->append(nuevoNodo);
+
+                    // Si no es la raíz
+                    if (nodo != raiz) {
+
+                        // Evita devolverse al padre...
+                        if (!(nodo->getPadre()->getPosI() == posI &&
+                                nodo->getPadre()->getPosJ() == j)) {
+
+                            // Si no es la posición del padre crea un nuevo nodo (campo) para ser evaluado)
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado);
+                            arbol->append(nuevoNodo);
+
+                        }
+
+                        // Se devuelve sólo si en la posición actual encontró un objetivo
+                        // variable devolver de tipo bool
+                        else if (devolver == true) {
+
+                            // Crea un nodo y pone false a devolver
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado);
+                            arbol->append(nuevoNodo);
+                            devolver = false;
+
+                        }
+
+                    }
+
+                    // Si es la raíz no hay problemas. No existe padre
+                    else {
+
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado);
+                        arbol->append(nuevoNodo);
+
+                    }
 
                 }
 
@@ -255,10 +306,30 @@ void Tablero::busquedaAmplitud() {
 
                 int posI = i+1;
                 int costoAcumulado = explorar(posI, j);
-                cout << "costo explorado en (" << posI << "," << j << ") es: " << costoAcumulado << endl;
                 if (costoAcumulado != -1) {
-                    Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado);
-                    arbol->append(nuevoNodo);
+
+                    if (nodo != raiz) {
+
+                        if (!(nodo->getPadre()->getPosI() == posI &&
+                                nodo->getPadre()->getPosJ() == j)) {
+
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado);
+                            arbol->append(nuevoNodo);
+
+                        } else if (devolver == true) {
+
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado);
+                            arbol->append(nuevoNodo);
+                            devolver = false;
+
+                        }
+
+                    } else {
+
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado);
+                        arbol->append(nuevoNodo);
+
+                    }
 
                 }
 
@@ -268,10 +339,30 @@ void Tablero::busquedaAmplitud() {
 
                 int posJ = j-1;
                 int costoAcumulado = explorar(i, posJ);
-                cout << "costo explorado en (" << i << "," << posJ << ") es: " << costoAcumulado << endl;
                 if (costoAcumulado != -1) {
-                    Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado);
-                    arbol->append(nuevoNodo);
+
+                    if (nodo != raiz) {
+
+                        if (!(nodo->getPadre()->getPosI() == i &&
+                                nodo->getPadre()->getPosJ() == posJ)) {
+
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado);
+                            arbol->append(nuevoNodo);
+
+                        } else if (devolver == true) {
+
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado);
+                            arbol->append(nuevoNodo);
+                            devolver = false;
+
+                        }
+
+                    } else {
+
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado);
+                        arbol->append(nuevoNodo);
+
+                    }
 
                 }
 
@@ -281,10 +372,29 @@ void Tablero::busquedaAmplitud() {
 
                 int posJ = j+1;
                 int costoAcumulado = explorar(i, posJ);
-                cout << "costo explorado en (" << i << "," << posJ << ") es: " << costoAcumulado << endl;
                 if (costoAcumulado != -1) {
-                    Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado);
-                    arbol->append(nuevoNodo);
+                    if (nodo != raiz) {
+
+                        if (!(nodo->getPadre()->getPosI() == i &&
+                                nodo->getPadre()->getPosJ() == posJ)) {
+
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado);
+                            arbol->append(nuevoNodo);
+
+                        } else if (devolver == true) {
+
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado);
+                            arbol->append(nuevoNodo);
+                            devolver = false;
+
+                        }
+
+                    } else {
+
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado);
+                        arbol->append(nuevoNodo);
+
+                    }
 
                 }
 
@@ -292,41 +402,67 @@ void Tablero::busquedaAmplitud() {
 
         }
 
+        // Elimina el primer nodo del vector
         arbol->pop_front();
-        //cout << arbol->size() << endl;
 
     }
 
     Nodo *tmp = meta;
-    int i = tmp->getPosI();
-    int j = tmp->getPosJ();
-    QString pos = "(" + QString::number(i) + "," + QString::number(j) + ")";
-    string coordenada = pos.toStdString();
-    cout << coordenada << endl;
 
-    while (tmp->getPadre() != NULL) {
+    while (tmp != NULL) {
 
+        camino->push_front(tmp);
         tmp = tmp->getPadre();
-        int i = tmp->getPosI();
-        int j = tmp->getPosJ();
-        pos = "(" + QString::number(i) + "," + QString::number(j) + ")";
-        coordenada = pos.toStdString();
-        cout << coordenada << endl;
+
+    }
+    int costo = 0;
+    for (int i = 0; i < camino->size(); i++) {
+
+        int posI = camino->at(i)->getPosI();
+        int posJ = camino->at(i)->getPosJ();
+
+        cout << "El costo en " << posI << "," << posJ << " es: " << camino->at(i)->getCosto() << endl;
+
+        if (matrizValores[posI][posJ] == 3)
+            robot->setTraje(true);
+
+        if (robot->getTraje() == true)
+            costo += 1;
+        else
+            costo += camino->at(i)->getCosto();
 
     }
 
+    cout << "El costo fue de " << costo << " unidades de fuerza\n";
+
 }
+
+/*
+ * Para que este método funcione, revisar apropiadamente cómo tener en cuenta que el robot lleve
+ * traje en las evaluaciones a las casillas, sobre todo en la de costos, donde se consideran muchas
+ * ramas y no en todas el robot lleva el traje
+ * */
 
 int Tablero::explorar(int i, int j) {
 
+    // Toma valor en la matriz asociada
     int codigo = matrizValores[i][j];
 
-    if (codigo == 0 || codigo == 3 || codigo == 6) return 1;
+    if (codigo == 1) return -1; // Muros
 
-    else if (codigo == 4) return 4;
+    else if (robot->getTraje() == true) return 1; // Si lleva traje es inmune
 
-    else if (codigo == 5) return 7;
+    // Si no lleva traje
+    else {
 
-    else return -1;
+        if (codigo == 0 || codigo == 3 || codigo == 6) return 1; // Si no es ningún campo magnético
+
+        else if (codigo == 4) return 4; // Campo magnético tipo 1
+
+        else if (codigo == 5) return 7; // Campo magnético tipo 2
+
+    }
+
+    return -1;
 
 }

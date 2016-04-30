@@ -38,6 +38,7 @@ private:
     Agente *robot;
     QVector <Nodo*> *arbol;
     int explorar(int i, int j);
+    QVector <Nodo*> *camino;
 };
 
 #endif // TABLERO_HPP

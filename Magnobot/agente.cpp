@@ -111,3 +111,15 @@ int Agente::getSizeIObjetivos() {
     return objetivos->size();
 
 }
+
+void Agente::setTraje(bool proteccion) {
+
+    traje = proteccion;
+
+}
+
+bool Agente::getTraje() {
+
+    return traje;
+
+}

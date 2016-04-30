@@ -22,6 +22,8 @@ public:
     void moverArr();
     void moverAba();
     int getSizeIObjetivos();
+    void setTraje (bool proteccion);
+    bool getTraje();
 
 private:
     int posI;
