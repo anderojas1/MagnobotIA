@@ -19,7 +19,10 @@ class Tablero : public QMainWindow
 public:
     explicit Tablero(QWidget *parent = 0);
     ~Tablero();
+    void busquedaAvara();
     void busquedaAmplitud();
+    QString get_ruta();
+    void desplazar(int a, int b, int x, int y, QString ruta);
 
 private slots:
     void on_buttonSalir_clicked();

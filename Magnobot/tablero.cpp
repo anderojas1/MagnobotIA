@@ -2,6 +2,7 @@
 #include "ui_tablero.h"
 #include <iostream>
 #include <string>
+#include <QThread>
 using namespace std;
 
 Tablero::Tablero(QWidget *parent) :
@@ -9,16 +10,7 @@ Tablero::Tablero(QWidget *parent) :
     ui(new Ui::Tablero)
 {
     ui->setupUi(this);
-    QString ruta = "";
-    int usuario = 0;
-    switch (usuario) {
-        case 0:
-            ruta = "/home/anderojas/Proyectos/Magnobot/Iconos/";
-        break;
-        case 1:
-            ruta = "/home/alchemixt/qt_projects/MagnobotIA/Magnobot/Iconos/";
-        break;
-    }
+    QString ruta = get_ruta();
 
     QPixmap pix(ruta+"logo_univalle.png");
     ui->lb_univalleLogo->setPixmap(pix);
@@ -79,16 +71,7 @@ void Tablero::on_buttonCargarArchivo_clicked()
     QFile tablero(ui->lineRutaArchivo->text()); // = QFile::QFile(ui->lineRutaArchivo->text());
 
     /* Selección de ruta */
-        QString ruta = "";
-        int usuario = 0;
-        switch (usuario) {
-            case 0:
-                ruta = "/home/anderojas/Proyectos/Magnobot/Iconos/";
-            break;
-            case 1:
-                ruta = "/home/alchemixt/qt_projects/MagnobotIA/Magnobot/Iconos/";
-            break;
-        }
+    QString ruta = get_ruta();
 
     if (!tablero.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
@@ -115,7 +98,6 @@ void Tablero::on_buttonCargarArchivo_clicked()
 
             if (valor == "1") {
 
-                campo->setIcon(QPixmap(100,100));
                 campo->setIcon(QPixmap::fromImage(QImage(ruta+"Pared01.png")));
                 qDebug("Encontrado ladrillos");
             }
@@ -190,6 +172,9 @@ void Tablero::on_buttonCargarArchivo_clicked()
     }
 
 }
+
+//Algoritmo de busqueda informada->Avara
+void Tablero::busquedaAvara(){}
 
 void Tablero::busquedaAmplitud() {
 
@@ -416,12 +401,25 @@ void Tablero::busquedaAmplitud() {
 
     }
     int costo = 0;
+
+    //variables que cargarán la anterior posición
+    int old_x = 0;
+    int old_y = 0;
+
     for (int i = 0; i < camino->size(); i++) {
 
         int posI = camino->at(i)->getPosI();
         int posJ = camino->at(i)->getPosJ();
 
         cout << "El costo en " << posI << "," << posJ << " es: " << camino->at(i)->getCosto() << endl;
+
+        //Aqui desplazamos el en la GUI
+        QString ruta = get_ruta();
+        desplazar(old_x, old_y, posI, posJ, ruta);
+
+        //seteamos old_x y old_y con la posición actual
+        old_x = posI;
+        old_y = posJ;
 
         if (matrizValores[posI][posJ] == 3)
             robot->setTraje(true);
@@ -466,3 +464,32 @@ int Tablero::explorar(int i, int j) {
     return -1;
 
 }
+
+QString Tablero::get_ruta(){
+    QString ruta = "";
+    //definimos el perfil en el que estamos para seleccionar la ruta
+    int perfil = 1;
+
+    switch (perfil) {
+        case 0:
+            ruta = "/home/anderojas/Proyectos/Magnobot/Iconos/";
+        break;
+        case 1:
+            ruta = "/home/alchemixt-ub16/Documentos/Proyectos/Magnobot/Iconos/";
+        break;
+    }
+    return ruta;
+}
+
+void Tablero::desplazar(int a, int b, int x, int y, QString ruta){
+    cout<<"desplazando desde "<<a<<","<<b<<" hacia"<<x<<","<<y<<endl;
+    QTableWidgetItem *casilla_ant = ui->tableTableroJuego->item(a, b);
+    QTableWidgetItem *casilla_act = ui->tableTableroJuego->item(x, y);
+
+    if(a==0 && b==0){}else{ casilla_ant->setIcon(QPixmap::fromImage(QImage(ruta+"Pared04.png")));}
+    casilla_act->setIcon(QPixmap::fromImage(QImage(ruta+"mega01.png")));
+
+    QThread::sleep(1);
+    ui->tableTableroJuego->repaint();
+}
+
