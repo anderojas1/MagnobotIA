@@ -21,6 +21,7 @@ public:
     ~Tablero();
     void busquedaAvara();
     void busquedaAmplitud();
+    void busquedaProfundidad();
     QString get_ruta();
     void desplazar(int a, int b, int x, int y, QString ruta);
 
@@ -40,7 +41,7 @@ private:
     int matrizValores [10][10];
     Agente *robot;
     QVector <Nodo*> *arbol;
-    int explorar(int i, int j);
+    int explorar(int i, int j, bool traje);
     QVector <Nodo*> *camino;
 };
 

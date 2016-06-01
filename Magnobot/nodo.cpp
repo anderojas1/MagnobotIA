@@ -1,11 +1,13 @@
 #include "nodo.hpp"
 
-Nodo::Nodo(int pos1, int pos2, Nodo *nodo, int valorCosto)
+Nodo::Nodo(int pos1, int pos2, Nodo *nodo, int valorCosto, bool traje, int validaDevolver)
 {
     padre = nodo;
     posI = pos1;
     posJ = pos2;
     costo = valorCosto;
+    this->traje = traje;
+    valida = validaDevolver;
 
 }
 
@@ -57,5 +59,29 @@ void Nodo::setPosJ(int pos) {
 Nodo* Nodo::getPadre() {
 
     return padre;
+
+}
+
+void Nodo::setTraje(bool chaleco) {
+
+    traje = chaleco;
+
+}
+
+bool Nodo::getTraje() {
+
+    return traje;
+
+}
+
+int Nodo::getValida() {
+
+    return valida;
+
+}
+
+void Nodo::setValida() {
+
+    valida++;
 
 }
