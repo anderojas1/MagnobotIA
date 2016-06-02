@@ -41,6 +41,7 @@ void Tablero::on_buttonEjecutar_clicked()
 
     if (ui->comboBoxAlgoritmo->currentText() == "Amplitud") busquedaAmplitud();
     else if (ui->comboBoxAlgoritmo->currentText() == "Profundidad (evita ciclos)") busquedaProfundidad();
+    else if (ui->comboBoxAlgoritmo->currentText() == "Costo uniforme") buscaCostoUniforme();
     else qWarning("botón ejecutar OK. Función no implementada aún");
 
 }
@@ -245,7 +246,7 @@ void Tablero::busquedaAmplitud() {
             if (i > 0) {
 
                 int posI = i-1;
-                int costoAcumulado = explorar(posI, j, nodo->getTraje()); // Explora la posición
+                int costoAcumulado = explorar(posI, j,nodo->getTraje()); // Explora la posición
 
                 // Si no es un muro
                 if (costoAcumulado != -1) {
@@ -291,7 +292,7 @@ void Tablero::busquedaAmplitud() {
             if (i < (ui->tableTableroJuego->rowCount()-1)) {
 
                 int posI = i+1;
-                int costoAcumulado = explorar(posI, j, nodo->getTraje());
+                int costoAcumulado = explorar(posI, j,nodo->getTraje());
                 if (costoAcumulado != -1) {
 
                     if (nodo != raiz) {
@@ -437,6 +438,392 @@ void Tablero::busquedaAmplitud() {
 
 }
 
+void Tablero::ordenarArbol(){
+
+    int i,j = 0;
+    Nodo *v = NULL;
+
+    for (i = 1; i < arbol->size(); i++){
+         v = arbol->at(i);
+         j = i - 1;
+
+         while (j >= 0 && arbol->at(j)->getCosto() > v->getCosto()){
+                arbol->replace((j + 1),arbol->at(j));
+                j--;
+         }
+
+         arbol->replace((j + 1),v);
+    }
+
+}
+
+void Tablero::buscaCostoUniforme() {
+
+    // Posición inicial es la posición del robot
+    int posIRobot = robot->getPosI();
+    int posJRobot = robot->getPosJ();
+
+    // Se crea el nodo raíz con la posición del robot
+    Nodo *raiz = new Nodo(posIRobot, posJRobot, NULL, 0,false,0);
+    // Se concatena al vector de búsqueda por amplitud
+    arbol->append(raiz);
+    // El nodo meta es cuando encuentra el último objetivo
+    Nodo *meta = NULL;
+    bool devolver = false;
+    int numObjetivos = 0;
+
+    int para = 0;
+
+    while (!robot->objetivosCompletos()) {  // Mientras le falte uno o más objetivos...
+        para ++;
+        // Toma el nodo que se encuentre de primero en el vector y toma la posición. Representa un cuadro en particular
+        Nodo *nodo = arbol->first();
+        int i = nodo->getPosI();
+        int j = nodo->getPosJ();
+
+        // Busca el código en la matriz asociada
+        int codigo = matrizValores[i][j];
+
+        // Si es un objetivo...
+        if (codigo == 6) {
+
+            /* Elimina un objetivo del vector de objetivos del robot
+             * Pone a 0 la posición en la matriz de valores asociada (elimina el objetivo de la matriz)
+             * Reinicia el algoritmo de búsqueda
+             * El nodo es ahora la nueva posición inicial
+             * Se permite devolver al robot
+             * */
+
+            robot->eliminarObjetivo();
+            matrizValores[i][j] = 0;
+            arbol->clear();
+            arbol->append(nodo);
+            cout << "objetivo encontrado en (" << i << "," << j << ")" << endl;
+            numObjetivos += 1;
+            nodo->setValida();
+
+        }
+
+        // Si el código es un traje...
+        else if (codigo == 3) {
+
+            nodo->setTraje(true);
+            numObjetivos += 1;
+            nodo->setValida();
+
+        }
+
+        // Si ha encontrado todos los objetivos
+        if (robot->objetivosCompletos()) {
+
+            // ¡Tenemos la meta! ¡Eureka!
+            meta = nodo;
+
+        }
+
+        // Si faltan objetivos
+        else {
+
+            /* Los if a continuación son usados para evaluar si se puede mover a izquierda, derecha
+             * arriba o a abajo, para evitar desbordamientos
+             * */
+
+            if (i < (ui->tableTableroJuego->rowCount()-1)) {
+
+                int posI = i+1;
+                int costoAcumulado = explorar(posI, j,nodo->getTraje());
+                if (costoAcumulado != -1) {
+
+                    if (nodo != raiz) {
+
+                        if (devolver == true) {
+
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                            arbol->append(nuevoNodo);
+                            devolver = false;
+
+                        }
+
+                        else {
+
+                            Nodo *tmp = nodo->getPadre();
+                            bool crear = true;
+
+                            while (tmp != NULL) {
+
+                                // Evita devolverse a los padres ...
+                                if (tmp->getPosI() == posI &&
+                                        tmp->getPosJ() == j && numObjetivos == tmp->getValida()) {
+
+                                    crear = false;
+
+                                }
+
+                                tmp = tmp->getPadre();
+
+                            }
+
+                            if (crear == true) {
+
+                                Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                                arbol->append(nuevoNodo);
+
+                            }
+
+                        }
+
+                    } else {
+
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                        arbol->append(nuevoNodo);
+
+                    }
+
+                }
+
+            }
+
+            if (j < ui->tableTableroJuego->columnCount()-1) {
+
+                int posJ = j+1;
+                int costoAcumulado = explorar(i, posJ, nodo->getTraje());
+
+                if (costoAcumulado != -1) {
+
+                    if (nodo != raiz) {
+
+                        if (devolver == true) {
+
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                            arbol->append(nuevoNodo);
+                            devolver = false;
+
+                        }
+
+                        else {
+
+                            Nodo *tmp = nodo->getPadre();
+                            bool crear = true;
+
+                            while (tmp != NULL) {
+
+                                // Evita devolverse a los padres ...
+                                if (tmp->getPosI() == i &&
+                                        tmp->getPosJ() == posJ && numObjetivos == tmp->getValida()) {
+
+                                    crear = false;
+
+                                }
+
+                                tmp = tmp->getPadre();
+
+                            }
+
+                            if (crear == true) {
+
+                                Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                                arbol->append(nuevoNodo);
+
+                            }
+
+                        }
+
+                    } else {
+
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                        arbol->append(nuevoNodo);
+
+                    }
+
+                }
+
+            }
+
+            if (j > 0) {
+
+                int posJ = j-1;
+                int costoAcumulado = explorar(i, posJ, nodo->getTraje());
+
+                if (costoAcumulado != -1) {
+
+                    if (nodo != raiz) {
+
+                        if (devolver == true) {
+
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                            arbol->append(nuevoNodo);
+                            devolver = false;
+
+
+                        }
+
+                        else {
+
+                            Nodo *tmp = nodo->getPadre();
+                            bool crear = true;
+
+                            while (tmp != NULL) {
+
+                                // Evita devolverse a los padres ...
+                                if (tmp->getPosI() == i &&
+                                        tmp->getPosJ() == posJ && numObjetivos == tmp->getValida()) {
+
+                                    crear = false;
+
+                                }
+
+                                tmp = tmp->getPadre();
+
+                            }
+
+                            if (crear == true) {
+
+                                Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                                arbol->append(nuevoNodo);
+
+                            }
+
+                        }
+
+                    } else {
+
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                        arbol->append(nuevoNodo);
+
+
+                    }
+
+                }
+
+            }
+
+
+            if (i > 0) {
+
+                int posI = i-1;
+                int costoAcumulado = explorar(posI, j,nodo->getTraje());// Explora la posición
+
+                // Si no es un muro
+                if (costoAcumulado != -1) {
+
+                    // Si no es la raíz
+                    if (nodo != raiz) {
+
+                        if (devolver == true) {
+
+                            // Crea un nodo y pone false a devolver
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                            arbol->append(nuevoNodo);
+                            devolver = false;
+
+
+                        }
+
+                        else {
+
+                            Nodo *tmp = nodo->getPadre();
+                            bool crear = true;
+
+                            while (tmp != NULL) {
+
+                                // Evita devolverse a los padres
+                                if (tmp->getPosI() == posI &&
+                                        tmp->getPosJ() == j && numObjetivos == tmp->getValida()) {
+
+                                    crear = false;
+
+                                }
+
+                                tmp = tmp->getPadre();
+
+                            }
+
+                            if (crear == true) {
+
+                                Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                                arbol->append(nuevoNodo);
+
+
+                            }
+
+                        }
+
+                    }
+
+                    // Si es la raíz no hay problemas. No existe padre
+                    else {
+
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                        arbol->append(nuevoNodo);
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        // Elimina el primer nodo del vector
+        if (arbol->size() > 20) {
+           QString str= "";
+        for (int var = 0; var < 20; ++var) {
+            str += QString::number(arbol->at(var)->getCosto());
+        }
+
+        cout << "costo: " << str.toStdString() << endl;
+        }
+        arbol->pop_front();
+        ordenarArbol();
+        cout << "(" << nodo->getPosI() << "," << nodo->getPosJ() << ") con costo de " << nodo->getCosto() << endl;
+
+    }
+
+    Nodo *tmp = meta;
+
+    while (tmp != NULL) {
+
+        camino->push_front(tmp);
+        tmp = tmp->getPadre();
+
+    }
+
+    int costo = 0;
+
+    //variables que cargarán la anterior posición
+    int old_x = 0;
+    int old_y = 0;
+
+    for (int i = 0; i < camino->size(); i++) {
+
+        int posI = camino->at(i)->getPosI();
+        int posJ = camino->at(i)->getPosJ();
+
+        cout << "El costo en " << posI << "," << posJ << " es: " << camino->at(i)->getCosto() << endl;
+
+        //Aqui desplazamos el en la GUI
+        QString ruta = get_ruta();
+        desplazar(old_x, old_y, posI, posJ, ruta);
+
+        //seteamos old_x y old_y con la posición actual
+        old_x = posI;
+        old_y = posJ;
+
+        if (matrizValores[posI][posJ] == 3)
+            robot->setTraje(true);
+
+        if (robot->getTraje() == true)
+            costo += 1;
+        else
+            costo += camino->at(i)->getCosto();
+
+    }
+
+    cout << "El costo fue de " << costo << " unidades de fuerza\n";
+
+}
+
+
 /*
  * Para que este método funcione, revisar apropiadamente cómo tener en cuenta que el robot lleve
  * traje en las evaluaciones a las casillas, sobre todo en la de costos, donde se consideran muchas
@@ -470,7 +857,7 @@ int Tablero::explorar(int i, int j, bool traje) {
 QString Tablero::get_ruta(){
     QString ruta = "";
     //definimos el perfil en el que estamos para seleccionar la ruta
-    int perfil = 0;
+    int perfil = 2;
 
     switch (perfil) {
         case 0:
@@ -478,6 +865,9 @@ QString Tablero::get_ruta(){
         break;
         case 1:
             ruta = "/home/alchemixt-ub16/Documentos/Proyectos/Magnobot/Iconos/";
+        break;
+        case 2:
+            ruta = "/home/julian/Desktop/IA/Proyecto copia /MagnobotIA/Magnobot/Iconos/";
         break;
     }
     return ruta;
@@ -488,7 +878,7 @@ void Tablero::desplazar(int a, int b, int x, int y, QString ruta){
     QTableWidgetItem *casilla_ant = ui->tableTableroJuego->item(a, b);
     QTableWidgetItem *casilla_act = ui->tableTableroJuego->item(x, y);
 
-    if(a==0 && b==0){}else{ casilla_ant->setIcon(QPixmap::fromImage(QImage(ruta+"Pared04.png")));}
+    if(a==0 && b==0){}else{ casilla_ant->setIcon(QPixmap::fromImage(QImage(ruta+"Pared04.jpg")));}
     casilla_act->setIcon(QPixmap::fromImage(QImage(ruta+"mega01.png")));
 
     QThread::sleep(1);
@@ -574,7 +964,7 @@ void Tablero::busquedaProfundidad() {
             if (i < (ui->tableTableroJuego->rowCount()-1)) {
 
                 int posI = i+1;
-                int costoAcumulado = explorar(posI, j, nodo->getTraje());
+                int costoAcumulado = explorar(posI, j,nodo->getTraje());
                 if (costoAcumulado != -1) {
 
                     if (nodo != raiz) {
@@ -751,7 +1141,7 @@ void Tablero::busquedaProfundidad() {
             if (i > 0) {
 
                 int posI = i-1;
-                int costoAcumulado = explorar(posI, j, nodo->getTraje()); // Explora la posición
+                int costoAcumulado = explorar(posI, j,nodo->getTraje());// Explora la posición
 
                 // Si no es un muro
                 if (costoAcumulado != -1) {

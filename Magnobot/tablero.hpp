@@ -24,6 +24,8 @@ public:
     void busquedaProfundidad();
     QString get_ruta();
     void desplazar(int a, int b, int x, int y, QString ruta);
+    void ordenarArbol();
+    void buscaCostoUniforme();
 
 private slots:
     void on_buttonSalir_clicked();
