@@ -1,4 +1,5 @@
 #include "agente.hpp"
+//#include "nodo.cpp"
 #include <iostream>
 using namespace std;
 
@@ -7,7 +8,7 @@ Agente::Agente(int pos1, int pos2) {
     posI = pos1;
     posJ = pos2;
     traje = false;
-    objetivos = new QVector<QString>();
+    objetivos = new QVector<Nodo*>();
 }
 
 Agente::Agente() {
@@ -15,7 +16,7 @@ Agente::Agente() {
     posI = 0;
     posJ = 0;
     traje = false;
-    objetivos = new QVector<QString>();
+    objetivos = new QVector<Nodo*>();
     cout << objetivos->size() << endl;
 
 }
@@ -59,9 +60,10 @@ int Agente::getPosJ() {
 
 }
 
-void Agente::addObjetivo() {
+void Agente::addObjetivo(int posI, int posJ) {
 
-    objetivos->append("objetivo " + QString::number(objetivos->size() +1));
+    Nodo *nodo = new Nodo(posI, posJ);
+    objetivos->append(nodo);
     qDebug("Añadido un ítem");
     cout << "el tamaño es ahora: " << objetivos->size() << endl;
 
@@ -79,6 +81,18 @@ void Agente::eliminarObjetivo() {
     cout << "eliminando objetivo...\n";
     objetivos->pop_front();
     cout << "falta(n) " << objetivos->size() << " objetivo(s) por encontrar\n";
+
+}
+
+Nodo* Agente::getPosicionObjetivo(int i) {
+
+    return objetivos->at(i);
+
+}
+
+QVector<Nodo*>* Agente::getPosicionesObjetivos() {
+
+    return objetivos;
 
 }
 

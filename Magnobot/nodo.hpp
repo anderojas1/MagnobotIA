@@ -6,7 +6,8 @@
 class Nodo
 {
 public:
-    Nodo(int pos1, int pos2, Nodo *nodo, int valor, bool traje, int validaDevolver);
+    Nodo(int pos1, int pos2, Nodo *nodo, int valor, bool traje, int validaDevolver, int nivel);
+    Nodo(int pos1, int pos2);
     ~Nodo();
     void setPadre (Nodo *nodo);
     void setCosto(int valor);
@@ -20,6 +21,8 @@ public:
     bool getTraje();
     void setValida();
     int getValida();
+    void setProfundidad(int nivel);
+    int getProfundidad();
 
 private:
 
@@ -29,6 +32,7 @@ private:
     int posJ;
     bool traje;
     int valida;
+    int profundidad;
 
 };
 

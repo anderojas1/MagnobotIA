@@ -25,6 +25,7 @@ public:
     QString get_ruta();
     void desplazar(int a, int b, int x, int y, QString ruta);
     void ordenarArbol();
+    void ordenarNodosObjetivos();
     void buscaCostoUniforme();
 
 private slots:

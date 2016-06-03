@@ -2,6 +2,7 @@
 #define AGENTE_H
 
 #include <QVector>
+#include <nodo.hpp>
 
 
 class Agente
@@ -14,7 +15,7 @@ public:
     int getPosI();
     void setPosJ(int pos);
     int getPosJ();
-    void addObjetivo();
+    void addObjetivo(int posI, int posJ);
     bool objetivosCompletos();
     void eliminarObjetivo();
     void moverIzq();
@@ -24,12 +25,14 @@ public:
     int getSizeIObjetivos();
     void setTraje (bool proteccion);
     bool getTraje();
+    Nodo *getPosicionObjetivo(int i);
+    QVector<Nodo*> *getPosicionesObjetivos();
 
 private:
     int posI;
     int posJ;
     bool traje;
-    QVector <QString> *objetivos;
+    QVector <Nodo*> *objetivos;
 };
 
 #endif // AGENTE_H

@@ -42,6 +42,7 @@ void Tablero::on_buttonEjecutar_clicked()
     if (ui->comboBoxAlgoritmo->currentText() == "Amplitud") busquedaAmplitud();
     else if (ui->comboBoxAlgoritmo->currentText() == "Profundidad (evita ciclos)") busquedaProfundidad();
     else if (ui->comboBoxAlgoritmo->currentText() == "Costo uniforme") buscaCostoUniforme();
+    else if (ui->comboBoxAlgoritmo->currentText() == "Avara") busquedaAvara();
     else qWarning("botón ejecutar OK. Función no implementada aún");
 
 }
@@ -138,7 +139,7 @@ void Tablero::on_buttonCargarArchivo_clicked()
 
                 campo->setIcon(QPixmap::fromImage(QImage(ruta+"key.jpg")));
                 qDebug("Encontrado ítem");
-                robot->addObjetivo();
+                robot->addObjetivo(lineaTableroI, j);
 
             }
 
@@ -176,16 +177,61 @@ void Tablero::on_buttonCargarArchivo_clicked()
 }
 
 //Algoritmo de busqueda informada->Avara
-void Tablero::busquedaAvara(){}
+void Tablero::busquedaAvara(){
+
+    QVector<Nodo*> *nodosTmp = new QVector<Nodo*>();
+    int flag = robot->getPosicionesObjetivos()->size();
+    int pos_i = robot->getPosI();
+    int pos_j = robot->getPosJ();
+    int nuevaPosI = pos_i;
+    int nuevaPosJ = pos_j;
+
+    while (flag > 0) {
+
+        for (int i = 0; i < robot->getPosicionesObjetivos()->size(); i++) {
+
+            nuevaPosI = robot->getPosicionesObjetivos()->at(i)->getPosI();
+            nuevaPosJ = robot->getPosicionesObjetivos()->at(i)->getPosJ();
+
+            int diferenciaI = qAbs(pos_i - nuevaPosI);
+            int diferenciaJ = qAbs(pos_j - nuevaPosJ);
+
+            int manhattan = diferenciaI + diferenciaJ;
+            robot->getPosicionesObjetivos()->at(i)->setCosto(manhattan);
+
+
+
+        }
+
+        ordenarNodosObjetivos();
+        nodosTmp->append(robot->getPosicionObjetivo(0));
+        robot->getPosicionesObjetivos()->pop_front();
+        flag--;
+        pos_i = nodosTmp->at(nodosTmp->size()-1)->getPosI();
+        pos_j = nodosTmp->at(nodosTmp->size()-1)->getPosJ();
+
+    }
+
+    for (int i = 0; i < nodosTmp->size(); i++) {
+
+        robot->getPosicionesObjetivos()->append(nodosTmp->at(i));
+        cout << "Costo para el objetivo " << (i+1) << "de: " << nodosTmp->at(i)->getCosto() << endl;
+
+    }
+
+}
 
 void Tablero::busquedaAmplitud() {
 
+    cout << "Iniciando búsqueda por amplitud\n";
     // Posición inicial es la posición del robot
     int posIRobot = robot->getPosI();
     int posJRobot = robot->getPosJ();
 
+    int numeroNodosExpandidos = 0;
+
     // Se crea el nodo raíz con la posición del robot
-    Nodo *raiz = new Nodo(posIRobot, posJRobot, NULL, 0, false, 0);
+    Nodo *raiz = new Nodo(posIRobot, posJRobot, NULL, 0, false, 0, 0);
     // Se concatena al vector de búsqueda por amplitud
     arbol->append(raiz);
     // El nodo meta es cuando encuentra el último objetivo
@@ -211,6 +257,7 @@ void Tablero::busquedaAmplitud() {
              * El nodo es ahora la nueva posición inicial
              * Se permite devolver al robot
              * */
+            cout << "Eliminando objetivo encontrado\n";
 
             robot->eliminarObjetivo();
             matrizValores[i][j] = 0;
@@ -233,11 +280,16 @@ void Tablero::busquedaAmplitud() {
 
             // ¡Tenemos la meta! ¡Eureka!
             meta = nodo;
+            cout << "Eureka\n";
 
         }
 
         // Si faltan objetivos
         else {
+
+            // Se suma 1 al número de nodos expandidos
+
+            numeroNodosExpandidos++;
 
             /* Los if a continuación son usados para evaluar si se puede mover a izquierda, derecha
              * arriba o a abajo, para evitar desbordamientos
@@ -259,7 +311,8 @@ void Tablero::busquedaAmplitud() {
                                 nodo->getPadre()->getPosJ() == j)) {
 
                             // Si no es la posición del padre crea un nuevo nodo (campo) para ser evaluado)
-                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), 0);
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), 0,
+                                                       nodo->getProfundidad() + 1);
                             arbol->append(nuevoNodo);
 
                         }
@@ -269,7 +322,8 @@ void Tablero::busquedaAmplitud() {
                         else if (devolver == true) {
 
                             // Crea un nodo y pone false a devolver
-                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), 0);
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), 0,
+                                                       nodo->getProfundidad() + 1);
                             arbol->append(nuevoNodo);
                             devolver = false;
 
@@ -280,7 +334,8 @@ void Tablero::busquedaAmplitud() {
                     // Si es la raíz no hay problemas. No existe padre
                     else {
 
-                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), 0);
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), 0,
+                                                   nodo->getProfundidad() + 1);
                         arbol->append(nuevoNodo);
 
                     }
@@ -300,12 +355,14 @@ void Tablero::busquedaAmplitud() {
                         if (!(nodo->getPadre()->getPosI() == posI &&
                                 nodo->getPadre()->getPosJ() == j)) {
 
-                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), 0);
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), 0,
+                                                       nodo->getProfundidad() + 1);
                             arbol->append(nuevoNodo);
 
                         } else if (devolver == true) {
 
-                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), 0);
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), 0,
+                                                       nodo->getProfundidad() + 1);
                             arbol->append(nuevoNodo);
                             devolver = false;
 
@@ -313,7 +370,8 @@ void Tablero::busquedaAmplitud() {
 
                     } else {
 
-                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), 0);
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), 0,
+                                                   nodo->getProfundidad() + 1);
                         arbol->append(nuevoNodo);
 
                     }
@@ -333,12 +391,14 @@ void Tablero::busquedaAmplitud() {
                         if (!(nodo->getPadre()->getPosI() == i &&
                                 nodo->getPadre()->getPosJ() == posJ)) {
 
-                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), 0);
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), 0,
+                                                       nodo->getProfundidad() + 1);
                             arbol->append(nuevoNodo);
 
                         } else if (devolver == true) {
 
-                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), 0);
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), 0,
+                                                       nodo->getProfundidad() + 1);
                             arbol->append(nuevoNodo);
                             devolver = false;
 
@@ -346,7 +406,8 @@ void Tablero::busquedaAmplitud() {
 
                     } else {
 
-                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), 0);
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), 0,
+                                                   nodo->getProfundidad() + 1);
                         arbol->append(nuevoNodo);
 
                     }
@@ -365,12 +426,14 @@ void Tablero::busquedaAmplitud() {
                         if (!(nodo->getPadre()->getPosI() == i &&
                                 nodo->getPadre()->getPosJ() == posJ)) {
 
-                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), 0);
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), 0,
+                                                       nodo->getProfundidad() + 1);
                             arbol->append(nuevoNodo);
 
                         } else if (devolver == true) {
 
-                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), 0);
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), 0,
+                                                       nodo->getProfundidad() + 1);
                             arbol->append(nuevoNodo);
                             devolver = false;
 
@@ -378,7 +441,8 @@ void Tablero::busquedaAmplitud() {
 
                     } else {
 
-                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), 0);
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), 0,
+                                                   nodo->getProfundidad() + 1);
                         arbol->append(nuevoNodo);
 
                     }
@@ -395,6 +459,8 @@ void Tablero::busquedaAmplitud() {
     }
 
     Nodo *tmp = meta;
+    cout << "Profundidad del árbol = " << meta->getProfundidad() << endl;
+    cout << "Número de nodos expandidos = " << numeroNodosExpandidos << endl;
 
     while (tmp != NULL) {
 
@@ -457,14 +523,41 @@ void Tablero::ordenarArbol(){
 
 }
 
+void Tablero::ordenarNodosObjetivos(){
+
+    int i,j = 0;
+    Nodo *v = NULL;
+
+    for (i = 1; i < robot->getPosicionesObjetivos()->size(); i++){
+         v = robot->getPosicionesObjetivos()->at(i);
+         j = i - 1;
+
+         while (j >= 0 && robot->getPosicionesObjetivos()->at(j)->getCosto() > v->getCosto()){
+                robot->getPosicionesObjetivos()->replace((j + 1),robot->getPosicionesObjetivos()->at(j));
+                j--;
+         }
+
+         robot->getPosicionesObjetivos()->replace((j + 1),v);
+    }
+
+    for (int i = 0; i < robot->getPosicionesObjetivos()->size(); i++) {
+
+        cout << "distancia objetivo " << (i+1) << " = " << robot->getPosicionesObjetivos()->at(i)->getCosto() << endl;
+
+    }
+
+}
+
 void Tablero::buscaCostoUniforme() {
+
+    int numeroNodosExpandidos = 0;
 
     // Posición inicial es la posición del robot
     int posIRobot = robot->getPosI();
     int posJRobot = robot->getPosJ();
 
     // Se crea el nodo raíz con la posición del robot
-    Nodo *raiz = new Nodo(posIRobot, posJRobot, NULL, 0,false,0);
+    Nodo *raiz = new Nodo(posIRobot, posJRobot, NULL, 0,false,0, 0);
     // Se concatena al vector de búsqueda por amplitud
     arbol->append(raiz);
     // El nodo meta es cuando encuentra el último objetivo
@@ -524,6 +617,8 @@ void Tablero::buscaCostoUniforme() {
         // Si faltan objetivos
         else {
 
+            numeroNodosExpandidos++;
+
             /* Los if a continuación son usados para evaluar si se puede mover a izquierda, derecha
              * arriba o a abajo, para evitar desbordamientos
              * */
@@ -538,7 +633,8 @@ void Tablero::buscaCostoUniforme() {
 
                         if (devolver == true) {
 
-                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos,
+                                                       nodo->getProfundidad() + 1);
                             arbol->append(nuevoNodo);
                             devolver = false;
 
@@ -565,7 +661,8 @@ void Tablero::buscaCostoUniforme() {
 
                             if (crear == true) {
 
-                                Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                                Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos,
+                                                           nodo->getProfundidad() + 1);
                                 arbol->append(nuevoNodo);
 
                             }
@@ -574,7 +671,8 @@ void Tablero::buscaCostoUniforme() {
 
                     } else {
 
-                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos,
+                                                   nodo->getProfundidad() + 1);
                         arbol->append(nuevoNodo);
 
                     }
@@ -594,7 +692,8 @@ void Tablero::buscaCostoUniforme() {
 
                         if (devolver == true) {
 
-                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos,
+                                                       nodo->getProfundidad() + 1);
                             arbol->append(nuevoNodo);
                             devolver = false;
 
@@ -621,7 +720,8 @@ void Tablero::buscaCostoUniforme() {
 
                             if (crear == true) {
 
-                                Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                                Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos,
+                                                           nodo->getProfundidad() + 1);
                                 arbol->append(nuevoNodo);
 
                             }
@@ -630,7 +730,8 @@ void Tablero::buscaCostoUniforme() {
 
                     } else {
 
-                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos,
+                                                   nodo->getProfundidad() + 1);
                         arbol->append(nuevoNodo);
 
                     }
@@ -650,7 +751,8 @@ void Tablero::buscaCostoUniforme() {
 
                         if (devolver == true) {
 
-                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos,
+                                                       nodo->getProfundidad() + 1);
                             arbol->append(nuevoNodo);
                             devolver = false;
 
@@ -678,7 +780,8 @@ void Tablero::buscaCostoUniforme() {
 
                             if (crear == true) {
 
-                                Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                                Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos,
+                                                           nodo->getProfundidad() + 1);
                                 arbol->append(nuevoNodo);
 
                             }
@@ -687,7 +790,8 @@ void Tablero::buscaCostoUniforme() {
 
                     } else {
 
-                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos,
+                                                   nodo->getProfundidad() + 1);
                         arbol->append(nuevoNodo);
 
 
@@ -712,7 +816,8 @@ void Tablero::buscaCostoUniforme() {
                         if (devolver == true) {
 
                             // Crea un nodo y pone false a devolver
-                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos,
+                                                       nodo->getProfundidad() + 1);
                             arbol->append(nuevoNodo);
                             devolver = false;
 
@@ -740,7 +845,8 @@ void Tablero::buscaCostoUniforme() {
 
                             if (crear == true) {
 
-                                Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                                Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos,
+                                                           nodo->getProfundidad() + 1);
                                 arbol->append(nuevoNodo);
 
 
@@ -753,7 +859,8 @@ void Tablero::buscaCostoUniforme() {
                     // Si es la raíz no hay problemas. No existe padre
                     else {
 
-                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos);
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado+nodo->getCosto(), nodo->getTraje(), numObjetivos,
+                                                   nodo->getProfundidad() + 1);
                         arbol->append(nuevoNodo);
 
                     }
@@ -780,6 +887,8 @@ void Tablero::buscaCostoUniforme() {
     }
 
     Nodo *tmp = meta;
+    cout << "La profundidad por búsqueda costo uniforme = " << meta->getProfundidad() << endl;
+    cout << "Número de nodos expandidos = " << numeroNodosExpandidos << endl;
 
     while (tmp != NULL) {
 
@@ -857,7 +966,7 @@ int Tablero::explorar(int i, int j, bool traje) {
 QString Tablero::get_ruta(){
     QString ruta = "";
     //definimos el perfil en el que estamos para seleccionar la ruta
-    int perfil = 2;
+    int perfil = 0;
 
     switch (perfil) {
         case 0:
@@ -887,12 +996,15 @@ void Tablero::desplazar(int a, int b, int x, int y, QString ruta){
 
 void Tablero::busquedaProfundidad() {
 
+    // Variable para los nodos expandidos
+    int numeroNodosExpandidos = 0;
+
     // Posición inicial es la posición del robot
     int posIRobot = robot->getPosI();
     int posJRobot = robot->getPosJ();
 
     // Se crea el nodo raíz con la posición del robot
-    Nodo *raiz = new Nodo(posIRobot, posJRobot, NULL, 0, false, 0);
+    Nodo *raiz = new Nodo(posIRobot, posJRobot, NULL, 0, false, 0, 0);
     // Se concatena al vector de búsqueda por amplitud
     arbol->append(raiz);
     // El nodo meta es cuando encuentra el último objetivo
@@ -957,6 +1069,9 @@ void Tablero::busquedaProfundidad() {
 
         else {
 
+            // Sumar 1 al número de nodos expandidos
+            numeroNodosExpandidos++;
+
              /* Los if a continuación son usados para evaluar si se puede mover a izquierda, derecha
              * arriba o a abajo, para evitar desbordamientos
              * */
@@ -971,7 +1086,8 @@ void Tablero::busquedaProfundidad() {
 
                         if (devolver == true) {
 
-                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), numObjetivos);
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), numObjetivos,
+                                                       nodo->getProfundidad() + 1);
                             arbol->insert(posInsert, nuevoNodo);
                             devolver = false;
                             posInsert++;
@@ -999,7 +1115,8 @@ void Tablero::busquedaProfundidad() {
 
                             if (crear == true) {
 
-                                Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), numObjetivos);
+                                Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), numObjetivos,
+                                                           nodo->getProfundidad() + 1);
                                 arbol->insert(posInsert, nuevoNodo);
                                 posInsert++;
 
@@ -1009,7 +1126,8 @@ void Tablero::busquedaProfundidad() {
 
                     } else {
 
-                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), numObjetivos);
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), numObjetivos,
+                                                   nodo->getProfundidad() + 1);
                         arbol->insert(posInsert, nuevoNodo);
                         posInsert++;
 
@@ -1030,7 +1148,8 @@ void Tablero::busquedaProfundidad() {
 
                         if (devolver == true) {
 
-                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), numObjetivos);
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), numObjetivos,
+                                                       nodo->getProfundidad() + 1);
                             arbol->insert(posInsert, nuevoNodo);
                             devolver = false;
                             posInsert++;
@@ -1058,7 +1177,8 @@ void Tablero::busquedaProfundidad() {
 
                             if (crear == true) {
 
-                                Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), numObjetivos);
+                                Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), numObjetivos,
+                                                           nodo->getProfundidad() + 1);
                                 arbol->insert(posInsert, nuevoNodo);
                                 posInsert++;
 
@@ -1068,7 +1188,8 @@ void Tablero::busquedaProfundidad() {
 
                     } else {
 
-                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), numObjetivos);
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), numObjetivos,
+                                                   nodo->getProfundidad() + 1);
                         arbol->insert(posInsert, nuevoNodo);
                         posInsert++;
 
@@ -1089,7 +1210,8 @@ void Tablero::busquedaProfundidad() {
 
                         if (devolver == true) {
 
-                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), numObjetivos);
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), numObjetivos,
+                                                       nodo->getProfundidad() + 1);
                             arbol->insert(posInsert, nuevoNodo);
                             devolver = false;
                             posInsert++;
@@ -1117,7 +1239,8 @@ void Tablero::busquedaProfundidad() {
 
                             if (crear == true) {
 
-                                Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), numObjetivos);
+                                Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), numObjetivos,
+                                                           nodo->getProfundidad() + 1);
                                 arbol->insert(posInsert, nuevoNodo);
                                 posInsert++;
 
@@ -1127,7 +1250,8 @@ void Tablero::busquedaProfundidad() {
 
                     } else {
 
-                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), numObjetivos);
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo,costoAcumulado, nodo->getTraje(), numObjetivos,
+                                                   nodo->getProfundidad() + 1);
                         arbol->insert(posInsert, nuevoNodo);
                         posInsert++;
 
@@ -1152,7 +1276,8 @@ void Tablero::busquedaProfundidad() {
                         if (devolver == true) {
 
                             // Crea un nodo y pone false a devolver
-                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), numObjetivos);
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), numObjetivos,
+                                                       nodo->getProfundidad() + 1);
                             arbol->insert(posInsert, nuevoNodo);
                             devolver = false;
                             posInsert++;
@@ -1180,7 +1305,8 @@ void Tablero::busquedaProfundidad() {
 
                             if (crear == true) {
 
-                                Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), numObjetivos);
+                                Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), numObjetivos,
+                                                           nodo->getProfundidad() + 1);
                                 arbol->insert(posInsert, nuevoNodo);
                                 posInsert++;
 
@@ -1193,7 +1319,8 @@ void Tablero::busquedaProfundidad() {
                     // Si es la raíz no hay problemas. No existe padre
                     else {
 
-                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), numObjetivos);
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo,costoAcumulado, nodo->getTraje(), numObjetivos,
+                                                   nodo->getProfundidad() + 1);
                         arbol->insert(posInsert, nuevoNodo);
                         posInsert++;
 
@@ -1211,6 +1338,8 @@ void Tablero::busquedaProfundidad() {
     }
 
     Nodo *tmp = meta;
+    cout << "La profundidad por búsqueda preferente por profundidad = " << meta->getProfundidad() << endl;
+    cout << "Número de nodos expandidos = " << numeroNodosExpandidos << endl;
 
     while (tmp != NULL) {
 
