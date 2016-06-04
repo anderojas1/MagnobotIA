@@ -43,6 +43,7 @@ void Tablero::on_buttonEjecutar_clicked()
     else if (ui->comboBoxAlgoritmo->currentText() == "Profundidad (evita ciclos)") busquedaProfundidad();
     else if (ui->comboBoxAlgoritmo->currentText() == "Costo uniforme") buscaCostoUniforme();
     else if (ui->comboBoxAlgoritmo->currentText() == "Avara") busquedaAvara();
+    else if (ui->comboBoxAlgoritmo->currentText() == "A*") busquedaAEstrella();
     else qWarning("botón ejecutar OK. Función no implementada aún");
 
 }
@@ -176,6 +177,414 @@ void Tablero::on_buttonCargarArchivo_clicked()
 
 }
 
+int Tablero::calcularHeuristica(int i, int j) {
+
+    Nodo *objetivoBuscado = robot->getPosicionObjetivo(0);
+
+    //cout << "Entra para heurística (" << i << "," << j << ")\n";
+
+    int dif_i = qAbs(objetivoBuscado->getPosI() - i);
+    int dif_j = qAbs(objetivoBuscado->getPosJ() - j);
+
+    int manhattan = dif_i + dif_j;
+
+    int heuristica = manhattan;
+
+    for (int k = 1; k < robot->getPosicionesObjetivos()->size(); k++) {
+
+        heuristica += robot->getPosicionObjetivo(k)->getCostoEstimado();
+
+    }
+
+    //cout << "Heurística = " << heuristica << endl;
+    //cout << "Costo real acumulado = " << costoReal << endl;
+    //cout << heuristica << endl;
+    return heuristica;
+
+}
+
+void Tablero::busquedaAEstrella(){
+
+    QVector<Nodo*> *nodosTmp = new QVector<Nodo*>();
+    int flag = robot->getPosicionesObjetivos()->size();
+    int pos_i = robot->getPosI();
+    int pos_j = robot->getPosJ();
+    int nuevaPosI = pos_i;
+    int nuevaPosJ = pos_j;
+
+    while (flag > 0) {
+
+        for (int i = 0; i < robot->getPosicionesObjetivos()->size(); i++) {
+
+            nuevaPosI = robot->getPosicionesObjetivos()->at(i)->getPosI();
+            nuevaPosJ = robot->getPosicionesObjetivos()->at(i)->getPosJ();
+
+            int diferenciaI = qAbs(pos_i - nuevaPosI);
+            int diferenciaJ = qAbs(pos_j - nuevaPosJ);
+
+            int manhattan = diferenciaI + diferenciaJ;
+            robot->getPosicionesObjetivos()->at(i)->setCostoEstimado(manhattan);
+
+
+
+        }
+
+        ordenarNodosObjetivos();
+        nodosTmp->append(robot->getPosicionObjetivo(0));
+        robot->getPosicionesObjetivos()->pop_front();
+        flag--;
+        pos_i = nodosTmp->at(nodosTmp->size()-1)->getPosI();
+        pos_j = nodosTmp->at(nodosTmp->size()-1)->getPosJ();
+
+    }
+
+    int heuristica = 0;
+
+    for (int i = 0; i < nodosTmp->size(); i++) {
+
+        robot->getPosicionesObjetivos()->append(nodosTmp->at(i));
+        heuristica += nodosTmp->at(i)->getCostoEstimado();
+        cout << "Costo para el objetivo " << (i+1) << "de: " << nodosTmp->at(i)->getCostoEstimado() << endl;
+
+    }
+
+    cout << "Iniciando búsqueda por Avara\n";
+    // Posición inicial es la posición del robot
+    int posIRobot = robot->getPosI();
+    int posJRobot = robot->getPosJ();
+
+    int numeroNodosExpandidos = 0;
+    int numObjetivos = 0;
+
+    Nodo *raiz = new Nodo(posIRobot, posJRobot, NULL, 0, false, 0, 0, heuristica);
+    arbol->append(raiz);
+    Nodo *meta = NULL;
+
+    while (!robot->objetivosCompletos()) {
+
+        Nodo *nodo = arbol->first();
+        int i = nodo->getPosI();
+        int j = nodo->getPosJ();
+
+        int codigo = matrizValores[i][j];
+
+        // Si es un objetivo...
+        if (codigo == 6) {
+
+            /* Elimina un objetivo del vector de objetivos del robot
+             * Pone a 0 la posición en la matriz de valores asociada (elimina el objetivo de la matriz)
+             * Reinicia el algoritmo de búsqueda
+             * El nodo es ahora la nueva posición inicial
+             * Se permite devolver al robot
+             * */
+
+            robot->eliminarObjetivo();
+            matrizValores[i][j] = 0;
+            arbol->clear();
+            arbol->append(nodo);
+            cout << "objetivo encontrado en (" << i << "," << j << ")" << endl;
+            numObjetivos += 1;
+            nodo->setValida();
+
+        }
+
+        // Si el código es un traje...
+        else if (codigo == 3) {
+
+            nodo->setTraje(true);
+            numObjetivos += 1;
+            nodo->setValida();
+
+        }
+
+        // Si ha encontrado todos los objetivos
+        if (robot->objetivosCompletos()) {
+
+            // ¡Tenemos la meta! ¡Eureka!
+            meta = nodo;
+
+        }
+
+        else {
+
+            numeroNodosExpandidos++;
+
+            if (i > 0) {
+
+                int posI = i-1;
+                int costoAcumulado = explorar(posI, j,nodo->getTraje()); // Explora la posición
+
+                // Si no es un muro
+                if (costoAcumulado != -1) {
+
+                    // Si no es la raíz
+                    if (nodo != raiz) {
+
+                        Nodo *tmp = nodo->getPadre();
+                        bool crear = true;
+
+                        while (tmp != NULL) {
+
+                            // Evita devolverse a los padres ...
+                            if (tmp->getPosI() == posI &&
+                                    tmp->getPosJ() == j && numObjetivos == tmp->getValida()) {
+
+                                crear = false;
+                                break;
+
+                            }
+
+                            tmp = tmp->getPadre();
+
+                        }
+
+                        if (crear == true) {
+
+                            int nuevaHeuristica = calcularHeuristica(posI, j);
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                       numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                            arbol->append(nuevoNodo);
+
+                        }
+
+                    }
+
+                    else {
+
+                        int nuevaHeuristica = calcularHeuristica(posI, j);
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                   numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                        arbol->append(nuevoNodo);
+
+                    }
+
+                }
+
+            }
+
+            if (i < (ui->tableTableroJuego->rowCount() - 1)) {
+
+                int posI = i+1;
+                int costoAcumulado = explorar(posI, j,nodo->getTraje()); // Explora la posición
+
+                // Si no es un muro
+                if (costoAcumulado != -1) {
+
+                    // Si no es la raíz
+                    if (nodo != raiz) {
+
+                        Nodo *tmp = nodo->getPadre();
+                        bool crear = true;
+
+                        while (tmp != NULL) {
+
+                            // Evita devolverse a los padres ...
+                            if (tmp->getPosI() == posI &&
+                                    tmp->getPosJ() == j && numObjetivos == tmp->getValida()) {
+
+                                crear = false;
+                                break;
+
+                            }
+
+                            tmp = tmp->getPadre();
+
+                        }
+
+                        if (crear == true) {
+
+                            int nuevaHeuristica = calcularHeuristica(posI, j);
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                       numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                            arbol->append(nuevoNodo);
+
+                        }
+
+                    }
+
+                    else {
+
+                        int nuevaHeuristica = calcularHeuristica(posI, j);
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                   numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                        arbol->append(nuevoNodo);
+
+                    }
+
+                }
+
+            }
+
+            if (j > 0) {
+
+                int posJ = j-1;
+                int costoAcumulado = explorar(i, posJ,nodo->getTraje()); // Explora la posición
+
+                // Si no es un muro
+                if (costoAcumulado != -1) {
+
+                    // Si no es la raíz
+                    if (nodo != raiz) {
+
+                        Nodo *tmp = nodo->getPadre();
+                        bool crear = true;
+
+                        while (tmp != NULL) {
+
+                            // Evita devolverse a los padres ...
+                            if (tmp->getPosI() == i &&
+                                    tmp->getPosJ() == posJ && numObjetivos == tmp->getValida()) {
+
+                                crear = false;
+                                break;
+
+                            }
+
+                            tmp = tmp->getPadre();
+
+                        }
+
+                        if (crear == true) {
+
+                            int nuevaHeuristica = calcularHeuristica(i, posJ);
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                       numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                            arbol->append(nuevoNodo);
+
+                        }
+
+                    }
+
+                    else {
+
+                        int nuevaHeuristica = calcularHeuristica(i, posJ);
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                   numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                        arbol->append(nuevoNodo);
+
+                    }
+
+                }
+
+            }
+
+            if (j < (ui->tableTableroJuego->columnCount() - 1)) {
+
+                int posJ = j+1;
+                int costoAcumulado = explorar(i, posJ,nodo->getTraje()); // Explora la posición
+
+                // Si no es un muro
+                if (costoAcumulado != -1) {
+
+                    // Si no es la raíz
+                    if (nodo != raiz) {
+
+                        Nodo *tmp = nodo->getPadre();
+                        bool crear = true;
+
+                        while (tmp != NULL) {
+
+                            // Evita devolverse a los padres ...
+                            if (tmp->getPosI() == i &&
+                                    tmp->getPosJ() == posJ && numObjetivos == tmp->getValida()) {
+
+                                crear = false;
+                                break;
+
+                            }
+
+                            tmp = tmp->getPadre();
+
+                        }
+
+                        if (crear == true) {
+
+                            int nuevaHeuristica = calcularHeuristica(i, posJ);
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                       numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                            arbol->append(nuevoNodo);
+
+                        }
+
+                    }
+
+                    else {
+
+                        int nuevaHeuristica = calcularHeuristica(i, posJ);
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                   numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                        arbol->append(nuevoNodo);
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        cout << "Heurística en (" << nodo->getPosI() << "," << nodo->getPosJ() << "): " <<
+                nodo->getCostoEstimado(true) << endl;
+        arbol->pop_front();
+        ordenarArbol(true, true);
+
+    }
+
+    Nodo *tmp = meta;
+    cout << "Profundidad del árbol = " << meta->getProfundidad() << endl;
+    cout << "Número de nodos expandidos = " << numeroNodosExpandidos << endl;
+
+    while (tmp != NULL) {
+
+        camino->push_front(tmp);
+        tmp = tmp->getPadre();
+
+    }
+
+    cout << "Ruta escogida\n";
+    for (int i = 0; i < camino->size(); i++) {
+
+        cout << "(" << camino->at(i)->getPosI() << "," << camino->at(i)->getPosJ() << ")\n";
+        cout << "Costo allí = " << camino->at(i)->getCosto() << endl;
+
+    }
+
+    int costo = 0;
+
+    //variables que cargarán la anterior posición
+    int old_x = 0;
+    int old_y = 0;
+
+    for (int i = 0; i < camino->size(); i++) {
+
+        int posI = camino->at(i)->getPosI();
+        int posJ = camino->at(i)->getPosJ();
+
+        //cout << "El costo en " << posI << "," << posJ << " es: " << camino->at(i)->getCosto() << endl;
+
+        //Aqui desplazamos el en la GUI
+        QString ruta = get_ruta();
+        desplazar(old_x, old_y, posI, posJ, ruta);
+
+        //seteamos old_x y old_y con la posición actual
+        old_x = posI;
+        old_y = posJ;
+
+        if (matrizValores[posI][posJ] == 3)
+            robot->setTraje(true);
+
+        if (robot->getTraje() == true)
+            costo += 1;
+        else
+            costo += camino->at(i)->getCosto();
+
+    }
+
+    cout << "El costo fue de " << costo << " unidades de fuerza\n";
+
+}
+
+
 //Algoritmo de busqueda informada->Avara
 void Tablero::busquedaAvara(){
 
@@ -197,7 +606,7 @@ void Tablero::busquedaAvara(){
             int diferenciaJ = qAbs(pos_j - nuevaPosJ);
 
             int manhattan = diferenciaI + diferenciaJ;
-            robot->getPosicionesObjetivos()->at(i)->setCosto(manhattan);
+            robot->getPosicionesObjetivos()->at(i)->setCostoEstimado(manhattan);
 
 
 
@@ -212,12 +621,347 @@ void Tablero::busquedaAvara(){
 
     }
 
+    int heuristica = 0;
+
     for (int i = 0; i < nodosTmp->size(); i++) {
 
         robot->getPosicionesObjetivos()->append(nodosTmp->at(i));
-        cout << "Costo para el objetivo " << (i+1) << "de: " << nodosTmp->at(i)->getCosto() << endl;
+        heuristica += nodosTmp->at(i)->getCostoEstimado();
+        cout << "Costo para el objetivo " << (i+1) << "de: " << nodosTmp->at(i)->getCostoEstimado() << endl;
 
     }
+
+    cout << "Iniciando búsqueda por Avara\n";
+    // Posición inicial es la posición del robot
+    int posIRobot = robot->getPosI();
+    int posJRobot = robot->getPosJ();
+
+    int numeroNodosExpandidos = 0;
+    int numObjetivos = 0;
+
+    Nodo *raiz = new Nodo(posIRobot, posJRobot, NULL, 0, false, 0, 0, heuristica);
+    arbol->append(raiz);
+    Nodo *meta = NULL;
+
+    while (!robot->objetivosCompletos()) {
+
+        Nodo *nodo = arbol->first();
+        int i = nodo->getPosI();
+        int j = nodo->getPosJ();
+
+        int codigo = matrizValores[i][j];
+
+        // Si es un objetivo...
+        if (codigo == 6) {
+
+            /* Elimina un objetivo del vector de objetivos del robot
+             * Pone a 0 la posición en la matriz de valores asociada (elimina el objetivo de la matriz)
+             * Reinicia el algoritmo de búsqueda
+             * El nodo es ahora la nueva posición inicial
+             * Se permite devolver al robot
+             * */
+
+            robot->eliminarObjetivo();
+            matrizValores[i][j] = 0;
+            arbol->clear();
+            arbol->append(nodo);
+            cout << "objetivo encontrado en (" << i << "," << j << ")" << endl;
+            numObjetivos += 1;
+            nodo->setValida();
+
+        }
+
+        // Si el código es un traje...
+        else if (codigo == 3) {
+
+            nodo->setTraje(true);
+            numObjetivos += 1;
+            nodo->setValida();
+
+        }
+
+        // Si ha encontrado todos los objetivos
+        if (robot->objetivosCompletos()) {
+
+            // ¡Tenemos la meta! ¡Eureka!
+            meta = nodo;
+
+        }
+
+        else {
+
+            numeroNodosExpandidos++;
+
+            if (i > 0) {
+
+                int posI = i-1;
+                int costoAcumulado = explorar(posI, j,nodo->getTraje()); // Explora la posición
+
+                // Si no es un muro
+                if (costoAcumulado != -1) {
+
+                    // Si no es la raíz
+                    if (nodo != raiz) {
+
+                        Nodo *tmp = nodo->getPadre();
+                        bool crear = true;
+
+                        while (tmp != NULL) {
+
+                            // Evita devolverse a los padres ...
+                            if (tmp->getPosI() == posI &&
+                                    tmp->getPosJ() == j && numObjetivos == tmp->getValida()) {
+
+                                crear = false;
+                                break;
+
+                            }
+
+                            tmp = tmp->getPadre();
+
+                        }
+
+                        if (crear == true) {
+
+                            int nuevaHeuristica = calcularHeuristica(posI, j);
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                       numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                            arbol->append(nuevoNodo);
+
+                        }
+
+                    }
+
+                    else {
+
+                        int nuevaHeuristica = calcularHeuristica(posI, j);
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                   numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                        arbol->append(nuevoNodo);
+
+                    }
+
+                }
+
+            }
+
+            if (i < (ui->tableTableroJuego->rowCount() - 1)) {
+
+                int posI = i+1;
+                int costoAcumulado = explorar(posI, j,nodo->getTraje()); // Explora la posición
+
+                // Si no es un muro
+                if (costoAcumulado != -1) {
+
+                    // Si no es la raíz
+                    if (nodo != raiz) {
+
+                        Nodo *tmp = nodo->getPadre();
+                        bool crear = true;
+
+                        while (tmp != NULL) {
+
+                            // Evita devolverse a los padres ...
+                            if (tmp->getPosI() == posI &&
+                                    tmp->getPosJ() == j && numObjetivos == tmp->getValida()) {
+
+                                crear = false;
+                                break;
+
+                            }
+
+                            tmp = tmp->getPadre();
+
+                        }
+
+                        if (crear == true) {
+
+                            int nuevaHeuristica = calcularHeuristica(posI, j);
+                            Nodo *nuevoNodo = new Nodo(posI,j,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                       numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                            arbol->append(nuevoNodo);
+
+                        }
+
+                    }
+
+                    else {
+
+                        int nuevaHeuristica = calcularHeuristica(posI, j);
+                        Nodo *nuevoNodo = new Nodo(posI,j,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                   numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                        arbol->append(nuevoNodo);
+
+                    }
+
+                }
+
+            }
+
+            if (j > 0) {
+
+                int posJ = j-1;
+                int costoAcumulado = explorar(i, posJ,nodo->getTraje()); // Explora la posición
+
+                // Si no es un muro
+                if (costoAcumulado != -1) {
+
+                    // Si no es la raíz
+                    if (nodo != raiz) {
+
+                        Nodo *tmp = nodo->getPadre();
+                        bool crear = true;
+
+                        while (tmp != NULL) {
+
+                            // Evita devolverse a los padres ...
+                            if (tmp->getPosI() == i &&
+                                    tmp->getPosJ() == posJ && numObjetivos == tmp->getValida()) {
+
+                                crear = false;
+                                break;
+
+                            }
+
+                            tmp = tmp->getPadre();
+
+                        }
+
+                        if (crear == true) {
+
+                            int nuevaHeuristica = calcularHeuristica(i, posJ);
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                       numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                            arbol->append(nuevoNodo);
+
+                        }
+
+                    }
+
+                    else {
+
+                        int nuevaHeuristica = calcularHeuristica(i, posJ);
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                   numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                        arbol->append(nuevoNodo);
+
+                    }
+
+                }
+
+            }
+
+            if (j < (ui->tableTableroJuego->columnCount() - 1)) {
+
+                int posJ = j+1;
+                int costoAcumulado = explorar(i, posJ,nodo->getTraje()); // Explora la posición
+
+                // Si no es un muro
+                if (costoAcumulado != -1) {
+
+                    // Si no es la raíz
+                    if (nodo != raiz) {
+
+                        Nodo *tmp = nodo->getPadre();
+                        bool crear = true;
+
+                        while (tmp != NULL) {
+
+                            // Evita devolverse a los padres ...
+                            if (tmp->getPosI() == i &&
+                                    tmp->getPosJ() == posJ && numObjetivos == tmp->getValida()) {
+
+                                crear = false;
+                                break;
+
+                            }
+
+                            tmp = tmp->getPadre();
+
+                        }
+
+                        if (crear == true) {
+
+                            int nuevaHeuristica = calcularHeuristica(i, posJ);
+                            Nodo *nuevoNodo = new Nodo(i,posJ,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                       numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                            arbol->append(nuevoNodo);
+
+                        }
+
+                    }
+
+                    else {
+
+                        int nuevaHeuristica = calcularHeuristica(i, posJ);
+                        Nodo *nuevoNodo = new Nodo(i,posJ,nodo, nodo->getCosto()+costoAcumulado, nodo->getTraje(),
+                                                   numObjetivos, nodo->getProfundidad() + 1, nuevaHeuristica);
+                        arbol->append(nuevoNodo);
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        cout << "Heurística en (" << nodo->getPosI() << "," << nodo->getPosJ() << "): " << nodo->getCostoEstimado() << endl;
+        arbol->pop_front();
+        ordenarArbol(true, false);
+
+    }
+
+    Nodo *tmp = meta;
+    cout << "Profundidad del árbol = " << meta->getProfundidad() << endl;
+    cout << "Número de nodos expandidos = " << numeroNodosExpandidos << endl;
+
+    while (tmp != NULL) {
+
+        camino->push_front(tmp);
+        tmp = tmp->getPadre();
+
+    }
+
+    cout << "Ruta escogida\n";
+    for (int i = 0; i < camino->size(); i++) {
+
+        cout << "(" << camino->at(i)->getPosI() << "," << camino->at(i)->getPosJ() << ")\n";
+
+    }
+
+    int costo = 0;
+
+    //variables que cargarán la anterior posición
+    int old_x = 0;
+    int old_y = 0;
+
+    for (int i = 0; i < camino->size(); i++) {
+
+        int posI = camino->at(i)->getPosI();
+        int posJ = camino->at(i)->getPosJ();
+
+        cout << "El costo en " << posI << "," << posJ << " es: " << camino->at(i)->getCosto() << endl;
+
+        //Aqui desplazamos el en la GUI
+        QString ruta = get_ruta();
+        desplazar(old_x, old_y, posI, posJ, ruta);
+
+        //seteamos old_x y old_y con la posición actual
+        old_x = posI;
+        old_y = posJ;
+
+        if (matrizValores[posI][posJ] == 3)
+            robot->setTraje(true);
+
+        if (robot->getTraje() == true)
+            costo += 1;
+        else
+            costo += camino->at(i)->getCosto();
+
+    }
+
+    cout << "El costo fue de " << costo << " unidades de fuerza\n";
 
 }
 
@@ -504,7 +1248,7 @@ void Tablero::busquedaAmplitud() {
 
 }
 
-void Tablero::ordenarArbol(){
+void Tablero::ordenarArbol(bool flag1, bool flag2){
 
     int i,j = 0;
     Nodo *v = NULL;
@@ -513,12 +1257,43 @@ void Tablero::ordenarArbol(){
          v = arbol->at(i);
          j = i - 1;
 
-         while (j >= 0 && arbol->at(j)->getCosto() > v->getCosto()){
+         if (flag1 == false) {
+
+             while (j >= 0 && arbol->at(j)->getCosto() > v->getCosto()){
                 arbol->replace((j + 1),arbol->at(j));
                 j--;
+             }
+
+             arbol->replace((j + 1),v);
+
          }
 
-         arbol->replace((j + 1),v);
+         else {
+
+             if (flag2 == true) {
+
+                 while (j >= 0 && arbol->at(j)->getCostoEstimado(true) > v->getCostoEstimado(true)){
+                    arbol->replace((j + 1),arbol->at(j));
+                    j--;
+                 }
+
+                 arbol->replace((j + 1),v);
+
+             }
+
+             else {
+
+                 while (j >= 0 && arbol->at(j)->getCostoEstimado() > v->getCostoEstimado()){
+                    arbol->replace((j + 1),arbol->at(j));
+                    j--;
+                 }
+
+                 arbol->replace((j + 1),v);
+
+             }
+
+         }
+
     }
 
 }
@@ -532,18 +1307,12 @@ void Tablero::ordenarNodosObjetivos(){
          v = robot->getPosicionesObjetivos()->at(i);
          j = i - 1;
 
-         while (j >= 0 && robot->getPosicionesObjetivos()->at(j)->getCosto() > v->getCosto()){
+         while (j >= 0 && robot->getPosicionesObjetivos()->at(j)->getCostoEstimado() > v->getCostoEstimado()){
                 robot->getPosicionesObjetivos()->replace((j + 1),robot->getPosicionesObjetivos()->at(j));
                 j--;
          }
 
          robot->getPosicionesObjetivos()->replace((j + 1),v);
-    }
-
-    for (int i = 0; i < robot->getPosicionesObjetivos()->size(); i++) {
-
-        cout << "distancia objetivo " << (i+1) << " = " << robot->getPosicionesObjetivos()->at(i)->getCosto() << endl;
-
     }
 
 }
@@ -983,7 +1752,7 @@ QString Tablero::get_ruta(){
 }
 
 void Tablero::desplazar(int a, int b, int x, int y, QString ruta){
-    cout<<"desplazando desde "<<a<<","<<b<<" hacia"<<x<<","<<y<<endl;
+    //cout<<"desplazando desde "<<a<<","<<b<<" hacia"<<x<<","<<y<<endl;
     QTableWidgetItem *casilla_ant = ui->tableTableroJuego->item(a, b);
     QTableWidgetItem *casilla_act = ui->tableTableroJuego->item(x, y);
 

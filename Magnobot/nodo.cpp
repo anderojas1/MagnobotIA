@@ -1,6 +1,6 @@
 #include "nodo.hpp"
 
-Nodo::Nodo(int pos1, int pos2, Nodo *nodo, int valorCosto, bool traje, int validaDevolver, int nivel)
+Nodo::Nodo(int pos1, int pos2, Nodo *nodo, int valorCosto, bool traje, int validaDevolver, int nivel, int heuristica)
 {
     padre = nodo;
     posI = pos1;
@@ -9,6 +9,7 @@ Nodo::Nodo(int pos1, int pos2, Nodo *nodo, int valorCosto, bool traje, int valid
     this->traje = traje;
     valida = validaDevolver;
     profundidad = nivel;
+    costoEstimado = heuristica;
 
 }
 
@@ -107,5 +108,18 @@ void Nodo::setProfundidad(int nivel) {
 int Nodo::getProfundidad() {
 
     return profundidad;
+
+}
+
+int Nodo::getCostoEstimado(bool flag) {
+
+    if (flag == false) return costoEstimado;
+    else return costo + costoEstimado;
+
+}
+
+void Nodo::setCostoEstimado(int heuristica) {
+
+    costoEstimado = heuristica;
 
 }

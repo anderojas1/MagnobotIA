@@ -22,11 +22,13 @@ public:
     void busquedaAvara();
     void busquedaAmplitud();
     void busquedaProfundidad();
+    void busquedaAEstrella();
     QString get_ruta();
     void desplazar(int a, int b, int x, int y, QString ruta);
-    void ordenarArbol();
+    void ordenarArbol(bool flag1 = false, bool flag2 = false);
     void ordenarNodosObjetivos();
     void buscaCostoUniforme();
+    int calcularHeuristica(int i, int j);
 
 private slots:
     void on_buttonSalir_clicked();
