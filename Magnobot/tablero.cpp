@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <QThread>
+#include <QInputDialog>
 using namespace std;
 
 Tablero::Tablero(QWidget *parent) :
@@ -10,13 +11,16 @@ Tablero::Tablero(QWidget *parent) :
     ui(new Ui::Tablero)
 {
     ui->setupUi(this);
-    QString ruta = get_ruta();
+    get_ruta();
+    ruta += "/";
+    cout << ruta.toStdString();
 
     QPixmap pix(ruta+"logo_univalle.png");
     ui->lb_univalleLogo->setPixmap(pix);
     robot = new Agente();
     arbol = new QVector<Nodo*>();
     camino = new QVector<Nodo*>();
+
 
 }
 
@@ -75,7 +79,6 @@ void Tablero::on_buttonCargarArchivo_clicked()
     QFile tablero(ui->lineRutaArchivo->text()); // = QFile::QFile(ui->lineRutaArchivo->text());
 
     /* Selección de ruta */
-    QString ruta = get_ruta();
 
     if (!tablero.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
@@ -524,6 +527,10 @@ void Tablero::busquedaAEstrella(){
         }
 
         cout << "Heurística en (" << nodo->getPosI() << "," << nodo->getPosJ() << "): " <<
+                nodo->getCostoEstimado() << endl;
+        cout << "Costo en (" << nodo->getPosI() << "," << nodo->getPosJ() << "): " <<
+                nodo->getCosto() << endl;
+        cout << "Valor de f(n) (" << nodo->getPosI() << "," << nodo->getPosJ() << "): " <<
                 nodo->getCostoEstimado(true) << endl;
         arbol->pop_front();
         ordenarArbol(true, true);
@@ -541,16 +548,6 @@ void Tablero::busquedaAEstrella(){
 
     }
 
-    cout << "Ruta escogida\n";
-    for (int i = 0; i < camino->size(); i++) {
-
-        cout << "(" << camino->at(i)->getPosI() << "," << camino->at(i)->getPosJ() << ")\n";
-        cout << "Costo allí = " << camino->at(i)->getCosto() << endl;
-
-    }
-
-    int costo = 0;
-
     //variables que cargarán la anterior posición
     int old_x = 0;
     int old_y = 0;
@@ -563,24 +560,14 @@ void Tablero::busquedaAEstrella(){
         //cout << "El costo en " << posI << "," << posJ << " es: " << camino->at(i)->getCosto() << endl;
 
         //Aqui desplazamos el en la GUI
-        QString ruta = get_ruta();
         desplazar(old_x, old_y, posI, posJ, ruta);
 
         //seteamos old_x y old_y con la posición actual
         old_x = posI;
         old_y = posJ;
-
-        if (matrizValores[posI][posJ] == 3)
-            robot->setTraje(true);
-
-        if (robot->getTraje() == true)
-            costo += 1;
-        else
-            costo += camino->at(i)->getCosto();
-
     }
 
-    cout << "El costo fue de " << costo << " unidades de fuerza\n";
+    cout << "El costo fue de " << camino->at(camino->size()-1)->getCosto() << " unidades de fuerza\n";
 
 }
 
@@ -930,8 +917,6 @@ void Tablero::busquedaAvara(){
 
     }
 
-    int costo = 0;
-
     //variables que cargarán la anterior posición
     int old_x = 0;
     int old_y = 0;
@@ -944,24 +929,14 @@ void Tablero::busquedaAvara(){
         cout << "El costo en " << posI << "," << posJ << " es: " << camino->at(i)->getCosto() << endl;
 
         //Aqui desplazamos el en la GUI
-        QString ruta = get_ruta();
         desplazar(old_x, old_y, posI, posJ, ruta);
 
         //seteamos old_x y old_y con la posición actual
         old_x = posI;
         old_y = posJ;
-
-        if (matrizValores[posI][posJ] == 3)
-            robot->setTraje(true);
-
-        if (robot->getTraje() == true)
-            costo += 1;
-        else
-            costo += camino->at(i)->getCosto();
-
     }
 
-    cout << "El costo fue de " << costo << " unidades de fuerza\n";
+    cout << "El costo fue de " << camino->at(camino->size()-1)->getCosto() << " unidades de fuerza\n";
 
 }
 
@@ -1227,7 +1202,6 @@ void Tablero::busquedaAmplitud() {
         cout << "El costo en " << posI << "," << posJ << " es: " << camino->at(i)->getCosto() << endl;
 
         //Aqui desplazamos el en la GUI
-        QString ruta = get_ruta();
         desplazar(old_x, old_y, posI, posJ, ruta);
 
         //seteamos old_x y old_y con la posición actual
@@ -1372,6 +1346,8 @@ void Tablero::buscaCostoUniforme() {
             nodo->setTraje(true);
             numObjetivos += 1;
             nodo->setValida();
+            cout << "validador de devolución vale " << nodo->getValida() << endl;
+            cout << "Validador anterior vale " << nodo->getPadre()->getValida() << endl;
 
         }
 
@@ -1386,6 +1362,7 @@ void Tablero::buscaCostoUniforme() {
         // Si faltan objetivos
         else {
 
+            cout << "Expandiendo nodo (" << nodo->getPosI() << "," << nodo->getPosJ() << ")\n";
             numeroNodosExpandidos++;
 
             /* Los if a continuación son usados para evaluar si se puede mover a izquierda, derecha
@@ -1418,9 +1395,10 @@ void Tablero::buscaCostoUniforme() {
 
                                 // Evita devolverse a los padres ...
                                 if (tmp->getPosI() == posI &&
-                                        tmp->getPosJ() == j && numObjetivos == tmp->getValida()) {
+                                        tmp->getPosJ() == j && nodo->getValida() == tmp->getValida()) {
 
                                     crear = false;
+                                    break;
 
                                 }
 
@@ -1477,9 +1455,10 @@ void Tablero::buscaCostoUniforme() {
 
                                 // Evita devolverse a los padres ...
                                 if (tmp->getPosI() == i &&
-                                        tmp->getPosJ() == posJ && numObjetivos == tmp->getValida()) {
+                                        tmp->getPosJ() == posJ && nodo->getValida() == tmp->getValida()) {
 
                                     crear = false;
+                                    break;
 
                                 }
 
@@ -1537,9 +1516,10 @@ void Tablero::buscaCostoUniforme() {
 
                                 // Evita devolverse a los padres ...
                                 if (tmp->getPosI() == i &&
-                                        tmp->getPosJ() == posJ && numObjetivos == tmp->getValida()) {
+                                        tmp->getPosJ() == posJ && nodo->getValida() == tmp->getValida()) {
 
                                     crear = false;
+                                    break;
 
                                 }
 
@@ -1602,9 +1582,10 @@ void Tablero::buscaCostoUniforme() {
 
                                 // Evita devolverse a los padres
                                 if (tmp->getPosI() == posI &&
-                                        tmp->getPosJ() == j && numObjetivos == tmp->getValida()) {
+                                        tmp->getPosJ() == j && nodo->getValida() == tmp->getValida()) {
 
                                     crear = false;
+                                    break;
 
                                 }
 
@@ -1641,14 +1622,7 @@ void Tablero::buscaCostoUniforme() {
         }
 
         // Elimina el primer nodo del vector
-        if (arbol->size() > 20) {
-           QString str= "";
-        for (int var = 0; var < 20; ++var) {
-            str += QString::number(arbol->at(var)->getCosto());
-        }
 
-        cout << "costo: " << str.toStdString() << endl;
-        }
         arbol->pop_front();
         ordenarArbol();
         cout << "(" << nodo->getPosI() << "," << nodo->getPosJ() << ") con costo de " << nodo->getCosto() << endl;
@@ -1666,8 +1640,6 @@ void Tablero::buscaCostoUniforme() {
 
     }
 
-    int costo = 0;
-
     //variables que cargarán la anterior posición
     int old_x = 0;
     int old_y = 0;
@@ -1677,27 +1649,16 @@ void Tablero::buscaCostoUniforme() {
         int posI = camino->at(i)->getPosI();
         int posJ = camino->at(i)->getPosJ();
 
-        cout << "El costo en " << posI << "," << posJ << " es: " << camino->at(i)->getCosto() << endl;
-
         //Aqui desplazamos el en la GUI
-        QString ruta = get_ruta();
         desplazar(old_x, old_y, posI, posJ, ruta);
 
         //seteamos old_x y old_y con la posición actual
         old_x = posI;
         old_y = posJ;
 
-        if (matrizValores[posI][posJ] == 3)
-            robot->setTraje(true);
-
-        if (robot->getTraje() == true)
-            costo += 1;
-        else
-            costo += camino->at(i)->getCosto();
-
     }
 
-    cout << "El costo fue de " << costo << " unidades de fuerza\n";
+    cout << "El costo fue de " << camino->at(camino->size()-1)->getCosto() << " unidades de fuerza\n";
 
 }
 
@@ -1732,12 +1693,27 @@ int Tablero::explorar(int i, int j, bool traje) {
 
 }
 
-QString Tablero::get_ruta(){
-    QString ruta = "";
+void Tablero::get_ruta(){
     //definimos el perfil en el que estamos para seleccionar la ruta
     int perfil = 0;
 
-    switch (perfil) {
+    bool ok;
+    QInputDialog* inputDialog = new QInputDialog();
+    inputDialog->setOptions(QInputDialog::NoButtons);
+
+    QString text =  inputDialog->getText(NULL ,"QInputDialog::getText() Example",
+                                          "Escoja su perfil\n"
+                                          "0) Anderson\n"
+                                          "1) Jhon Erik\n"
+                                          "2) Julián\n"
+                                          "3) Otro", QLineEdit::Normal,
+                                          QDir::home().dirName(), &ok);
+
+     if (ok && !text.isEmpty())
+     {
+        perfil = text.toInt();
+     }
+     switch (perfil) {
         case 0:
             ruta = "/home/anderojas/Proyectos/Magnobot/Iconos/";
         break;
@@ -1747,8 +1723,11 @@ QString Tablero::get_ruta(){
         case 2:
             ruta = "/home/julian/Desktop/IA/Proyecto copia /MagnobotIA/Magnobot/Iconos/";
         break;
+        case 3:
+            ruta = QFileDialog::getExistingDirectory(this, tr("Abrir directorio iconos"), "/home", QFileDialog::ShowDirsOnly);
+        break;
+
     }
-    return ruta;
 }
 
 void Tablero::desplazar(int a, int b, int x, int y, QString ruta){
@@ -2130,7 +2109,6 @@ void Tablero::busquedaProfundidad() {
         cout << "El costo en " << posI << "," << posJ << " es: " << camino->at(i)->getCosto() << endl;
 
         //Aqui desplazamos el en la GUI
-        QString ruta = get_ruta();
         desplazar(old_x, old_y, posI, posJ, ruta);
 
         //seteamos old_x y old_y con la posición actual

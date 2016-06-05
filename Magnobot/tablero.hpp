@@ -23,7 +23,7 @@ public:
     void busquedaAmplitud();
     void busquedaProfundidad();
     void busquedaAEstrella();
-    QString get_ruta();
+    void get_ruta();
     void desplazar(int a, int b, int x, int y, QString ruta);
     void ordenarArbol(bool flag1 = false, bool flag2 = false);
     void ordenarNodosObjetivos();
@@ -48,6 +48,7 @@ private:
     QVector <Nodo*> *arbol;
     int explorar(int i, int j, bool traje);
     QVector <Nodo*> *camino;
+    QString ruta;
 };
 
 #endif // TABLERO_HPP
